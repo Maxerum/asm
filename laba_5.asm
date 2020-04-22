@@ -34,7 +34,7 @@
      read_error db "Read error",'$'
      open_source_file_str db "Open source file", '$'
      getting_file_path db "Getting file path", '$' 
-     getting_word db  "Getting word", '$'
+     getting_word db  "Get word", '$'
      get_word_len db "Get word len",'$' 
      close_files_str db "Closing files",'$'
      new_line db 10,13,'$'            
@@ -59,27 +59,16 @@ output_str macro str
     
     pop dx
     pop ax
-output_str endm  
+output_str endm 
 
-cmp_arg_len_with_zero macro string  
-    push si
-    
-    lea si, string
-    call str_len
-    
-    pop si
-    cmp ax,0
-    je  emp
-endm    
-
- 
 get_file_path proc
+    
     push ax 
     push cx
     push di
     xor ax,ax
     xor cx,cx
-
+    
     mov cl,cmdl_size   
     
     lea si, cmdl          ; command line - source string 
@@ -108,7 +97,21 @@ delim_symbol:
      pop cx
      pop ax
      ret              
-endp
+endp      
+
+cmp_arg_len_with_zero macro string  
+    push si
+    
+    lea si, string
+    call str_len
+    
+    pop si
+    cmp ax,0
+    je  emp
+endm    
+
+ 
+
 ;           
 ;
 get_word proc
@@ -154,7 +157,7 @@ create_and_open_dest_file proc
     lea dx, destination_path
     int 21h
     
-    jb open_error
+    jc open_error
     
     mov ah,3Dh
     mov al,02h
@@ -163,7 +166,7 @@ create_and_open_dest_file proc
     
     jc open_error
     
-    mov dest_handle, ax
+    mov dest_handle, ax ;remember dest_handle
     
     mov ax,0
     jmp end_proc
@@ -178,29 +181,24 @@ open_file proc
     lea si, file_path
     call str_len
     
-    
     xor si,si
     mov si,ax
     sub si,1           
     ;check extension of the file           
     cmp file_path[si], 't' 
-	jne check_open_error     
-	
+	jne check_open_error     	
 	sub si, 1
 	
 	cmp file_path[si], 'x' 
-	jne check_open_error    
-	
+	jne check_open_error    	
 	sub si, 1
 	
 	cmp file_path[si], 't' 
-	jne check_open_error   
-	
+	jne check_open_error   	
 	sub si, 1
 	
 	cmp file_path[si], '.' 
-	jne check_open_error           
-    
+	jne check_open_error               
     jmp open_source_file
 
 check_open_error: 
@@ -210,20 +208,18 @@ check_open_error:
 open_source_file:                
 	pop si           
                
-    mov ah,3Dh
-    mov al,02h
-    lea dx,file_path
-    ;mov cl, 01h
+    mov ah,3Dh;function to open file
+    mov al,02h; open file for read/write
+    lea dx,file_path;
     int 21h
     
-    jb open_error
+    jc open_error  
     
     output_str open_source_file_str
     
     mov source_handle,ax 
     
     call create_and_open_dest_file
-
     
 open_error:
      
@@ -248,13 +244,14 @@ end_proc:
 open_file endp
 
 
-str_len proc                   
+str_len proc
+    push cx                   
 	push bx                     
 	push si                       
 	xor ax, ax                 
 	;lea si,word  ; set offset of word to si
 count_len:                  
-     mov bl, ds:[si]          
+     mov bl, ds:[si];go while not zero          
 	 cmp bl, 0            
 	 je end_count_len             
 	 inc si                
@@ -264,7 +261,8 @@ count_len:
 end_count_len:
     mov size_of_word, ax                    ;
 	pop si                      ;
-	pop bx                      
+	pop bx
+	push cx                      
 	ret                         ;
 str_len endp
 
@@ -278,7 +276,7 @@ read_from_file proc
     
     mov bx, source_handle        ; a part of file to buffer  
     mov ah, 3Fh                  ;            
-    mov cx, 00C8h;0Fh;                ; 00C8h = 200 bytes         
+    mov cx, 200                  ;max amount of bytes to read      
     mov dx, offset file_buffer   ; 
     int 21h   
     
@@ -291,18 +289,14 @@ read_from_file proc
 read_from_file endp
 
 set_pointer_by_processed_bytes proc 
-    pusha
-      
+    pusha  
     mov bx, source_handle
     mov al, 00h  
     xor cx, cx                      ;the beginning of file  
     mov dx, processed_bytes_l         ; - 
     mov cx, processed_bytes_h         ; - amount of bytes
     mov ah, 42h 
-   
-    int 21h
-    
-     
+    int 21h 
     popa    
     ret
 set_pointer_by_processed_bytes endp
@@ -356,7 +350,6 @@ start:
     mov ax, @data
     mov es, ax
     
-    
     xor ch, ch              ; 
 	mov cl, ds:[80h]		; set len of command line
 	mov cmdl_size, cl 		; 
@@ -365,24 +358,22 @@ start:
 	rep movsb               ; transfer bytes from si to di
                             ;
 	mov ds, ax  
-
      
     mov cmdl_size, bl 
-            
     
-        
-    call get_file_path        
-    
+    output_str getting_file_path        
+    call get_file_path  
+ 
     cmp_arg_len_with_zero file_path
     
-    
+    output_str getting_word
     call get_word
-;         
+         
     call open_file
-    cmp ax, 0               ;
+    cmp ax, 0               
 	jne end_program
 	   
-      xor dx, dx         
+    xor dx, dx         
     lea si, word
     call str_len ;we know len of deleted word
    
@@ -395,21 +386,19 @@ process_files:
     cmp ax, 0000h              
     je ending                ;if readed bytes equal to zero 
     
-    mov dx, size_of_word ; 
+    mov dx, size_of_word; 
     ;inc dx
     
     cmp ax, dx ;compare amount of readed bytes and size of word
     jb write_small_part_of_word ;if smaller just write  part of buffer which smaller than size of word 
     
     lea si,file_buffer;set si to begin of file's buffer
-    lea di,word;set di to begin of te deleted word
-                          
-    sub al, dl; count amount of bytes without word's bytes  
+    lea di,word;set di to begin of the deleted word
     
-    xor cx, cx;      
+    sub al, dl; count amount of bytes without word's bytes  
+                              
     mov cl, al; amount of bytes we should process  
     inc cx
-    
 find_the_word:
         pusha  
         ;check delimiters to find words
@@ -420,7 +409,8 @@ find_the_word:
         je str_cmp 
         
         cmp ds[si-1], '$'
-        je str_cmp
+        je str_cmp                                                                                  
+        
         
         cmp ds[si-1], 0Dh
         je str_cmp   
@@ -484,12 +474,12 @@ next:
         jmp process_files          
                   
 is_find:
-         
-       mov di, offset file_buffer  ;  
+        
+       mov di, offset file_buffer; begin of file buffer to di 
 
-       mov cx, si       ;       
+       mov cx, si       ; end of finded qord to di      
       
-       sub cx, offset file_buffer; number of bytes where words are equal  
+       sub cx, offset file_buffer; get position in file buffer where word ended  
        
        xor ax, ax
        mov ax, size_of_word;
@@ -502,10 +492,10 @@ next_write_to_buffer:
        
        call write_buffer 
      
-       call add_processed_bytes
+       call add_processed_bytes;add proccesed bytes without finded word
       
        mov ax, size_of_word
-       call add_processed_bytes
+       call add_processed_bytes ;add processed bytes after finded word, which we shouldn't to write
        
        jmp process_files                            
    
@@ -517,9 +507,6 @@ write_small_part_of_word:
 ending:
     
 
-
-
-
 mov bx, source_handle
 call close_file  
 
@@ -529,8 +516,6 @@ call close_file
 
 output_str  close_files_str
 jmp end_program
-
-
 
 emp:
     output_str empty_command_line
