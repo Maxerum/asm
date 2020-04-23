@@ -22,11 +22,19 @@
      source_handle dw 0
      dest_handle  dw 0  
 ;    
-
+     buferr_size equ 200
      word db 50, 52 dup ('$')
-     file_buffer db 200 dup ('$')  
+     file_buffer db buferr_size dup ('$')  
 
      begin_buffer_flag db 0  
+     
+
+     space equ ' '
+     new_line_symbol equ 13
+     car_return_symbol equ 10
+     tab equ 9
+     end_of_asciiz_str equ 0 
+     end_of_str equ '$'
      
      empty_command_line db "Empty command line", '$'                
      open_error_str db "Open error", '$'
@@ -49,12 +57,8 @@ output_str macro str
     mov ah,9
     int 21h 
     
-    mov dl,0Ah
-    mov ah,02h
-    int 21h
-    
-    mov dl,0Dh
-    mov ah,02h         
+    lea dx, new_line
+    mov ah, 9
     int 21h
     
     pop dx
@@ -77,9 +81,9 @@ get_file_path proc
     lea di, file_path     ; file path - destination string
 loop_get_path:    
     mov bl, ds:[si]
-    cmp bl,' ' 
+    cmp bl,space;' ' 
     je delim_symbol
-    cmp bl,0
+    cmp bl, end_of_asciiz_str;0
     je delim_symbol
     
     
@@ -111,9 +115,6 @@ cmp_arg_len_with_zero macro string
 endm    
 
  
-
-;           
-;
 get_word proc
     push ax 
     push cx
@@ -128,10 +129,10 @@ get_word proc
     lea di,word      ; file path - destination string
 loop_get_word:    
     mov bl, ds:[si]
-    cmp bl,' ' 
+    cmp bl,space;' ' 
     je delim_symbol_w                   
     
-    cmp bl,0
+    cmp bl, end_of_asciiz_str;0
     je delim_symbol_w
     
     mov es:[di],bl
@@ -182,7 +183,7 @@ open_file proc
     call str_len
     
     xor si,si
-    mov si,ax
+    mov si,ax;in si amount of bytes in finded file path
     sub si,1           
     ;check extension of the file           
     cmp file_path[si], 't' 
@@ -234,7 +235,7 @@ open_error:
     
      
 found_error:
-     mov ax,1
+    mov ax,1
 end_proc:
     
     pop dx
@@ -252,7 +253,7 @@ str_len proc
 	;lea si,word  ; set offset of word to si
 count_len:                  
      mov bl, ds:[si];go while not zero          
-	 cmp bl, 0            
+	 cmp bl,  end_of_asciiz_str;0            
 	 je end_count_len             
 	 inc si                
 	 inc ax                                                                    
@@ -276,7 +277,7 @@ read_from_file proc
     
     mov bx, source_handle        ; a part of file to buffer  
     mov ah, 3Fh                  ;            
-    mov cx, 200                  ;max amount of bytes to read      
+    mov cx, buferr_size;200                  ;max amount of bytes to read      
     mov dx, offset file_buffer   ; 
     int 21h   
     
@@ -291,7 +292,7 @@ read_from_file endp
 set_pointer_by_processed_bytes proc 
     pusha  
     mov bx, source_handle
-    mov al, 00h  
+    mov al, 00h; move pointer from begin  
     xor cx, cx                      ;the beginning of file  
     mov dx, processed_bytes_l         ; - 
     mov cx, processed_bytes_h         ; - amount of bytes
@@ -316,25 +317,23 @@ close_file endp
 
 write_buffer proc 
     ;write cx bytes to destination file
-    pusha
+        pusha
         lea dx, file_buffer      
         mov bx, dest_handle
         mov cx, ax
         mov ah, 40h   
         int 21h
           
-    popa
-    ret  
+        popa
+        ret  
 write_buffer endp                    
                     
 add_processed_bytes proc 
     pusha
         mov dx, processed_bytes_l
-        mov bx, processed_bytes_h 
-        
+        mov bx, processed_bytes_h         
         add dx, ax
-        jae end_operations
-        
+        jae end_operations        
         inc bx 
                
 end_operations:      
@@ -383,7 +382,7 @@ process_files:
     call read_from_file;             
     
     mov ax, readed_bytes;    
-    cmp ax, 0000h              
+    cmp ax, 0              
     je ending                ;if readed bytes equal to zero 
     
     mov dx, size_of_word; 
@@ -405,26 +404,23 @@ find_the_word:
         cmp begin_buffer_flag, 0
         je str_cmp 
                 
-        cmp ds[si-1], ' '
+        cmp ds[si-1], space;' '
         je str_cmp 
         
-        cmp ds[si-1], '$'
+        cmp ds[si-1], end_of_str;'$'
         je str_cmp                                                                                  
-        
-        
-        cmp ds[si-1], 0Dh
+           
+        cmp ds[si-1], new_line_symbol
         je str_cmp   
         
-        cmp ds[si-1], 0Dh
+        
+        cmp ds[si-1], car_return_symbol;0Ah
         je str_cmp
         
-        cmp ds[si-1], 0Ah
-        je str_cmp
-        
-        cmp ds[si-1], 09h
+        cmp ds[si-1], tab;09h
         je str_cmp
        
-        cmp ds[si-1], 0h
+        cmp ds[si-1],  end_of_asciiz_str;0h
         je str_cmp
        
         jmp next
@@ -436,22 +432,22 @@ str_cmp:
         repe cmpsb         
         jnz next      
         
-        cmp ds[si], ' '
+        cmp ds[si],space; ' ';space
         je is_find 
         
-        cmp ds[si], '$'
+        cmp ds[si], end_of_str; '$' 
         je is_find
         
-        cmp ds[si], 0Dh
+        cmp ds[si], new_line_symbol;0Dh 
         je is_find
         
-        cmp ds[si], 0Ah
+        cmp ds[si], car_return_symbol;0Ah
         je is_find
         
-        cmp ds[si], 09h
+        cmp ds[si], tab;09h
         je is_find
        
-        cmp ds[si], 0h
+        cmp ds[si],  end_of_asciiz_str;0h
         je is_find
          
 next:
