@@ -31,35 +31,41 @@
 
      ;file_id dw 0
 ;     result_file_id dw 0 
+     empty_command_line db "Empty command line", '$'                
+     open_error_str db "Open error", '$'
+     found_error_str db "File not found", '$' 
+     read_error db "Read error",'$'
+     open_source_file_str db "Open source file", '$'
+     getting_file_path db "Get file path", '$' 
+     getting_word db  "Get word", '$'
+     get_word_len db "Get word len",'$' 
+     close_files_str db "Close files",'$'
+     new_line db 10,13,'$'
 
-     error_message1 db "Unable to open a file",13,10,'$'
-    error_message2 db "Unable to create and open temp file",13,10,'$'
-
-    error_message3 db "Unable to close a file",13,10,'$'
-    error_message4 db "Unable to delete a file",13,10,'$'
-    error_message5 db "Invalid input",13,10,'$'
-    error_message6 db "Unable to rename a file",13,10,'$'
-    error_message7 db "File name is too long",13,10,'$'
-
-SPACE equ 20h
-TAB equ 9h
-NEW_LINE equ 0Ah
-CARRIAGE_RETURN equ 0Dh
+     space equ ' '
+     new_line_symbol equ 13
+     car_return_symbol equ 10
+     tab equ 9
+     end_of_asciiz_str equ 0 
+     end_of_str equ '$'
           
 .code         
    
-   ;output  
-show_str MACRO
+   ; 
+output_str macro
     push ax
     
     mov ah,9
     int 21h
     
-    pop ax    
-ENDM
-
-get_file_path proc
+    lea dx, new_line
+    mov ah, 9
+    int 21h
     
+    pop ax    
+endm
+
+get_file_path proc   
     push ax 
     push cx
     push di
@@ -96,16 +102,16 @@ delim_symbol:
      ret              
 get_file_path endp      
 
-cmp_arg_len_with_zero macro string  
-    push si
-    
-    lea si, string
-    call str_len
-    
-    pop si
-    cmp ax,0
-    je  emp
-endm    
+;cmp_arg_len_with_zero macro string  
+;    push si
+;    
+;    lea si, string
+;    call str_len
+;    
+;    pop si
+;    cmp ax,0
+;    je  emp
+;endm    
 
 read_cmdl proc
     push cx 
@@ -115,20 +121,11 @@ read_cmdl proc
     xor cx, cx              ; 
 	mov cl, ds:[80h]		; set len of command line
 	mov bx, cx
-	 		; 
+	 		 
 	mov si, 81h             ; set si in 81h because the first symbol always space
 	lea di, cmdl            ; set di into begin of cmdl
 	rep movsb 
-	;
-;    xor cx,cx
-;    mov cl,ds:[0080h]
-;    mov bx,cx
-;   
-;    mov si,81h
-;    lea di,command_line
-;    
-;    rep movsb
-    
+        
     pop di
     pop si
     pop cx
@@ -171,50 +168,6 @@ delim_symbol_w:
                                            
      ret             
 endp
-;
-;create_and_open_dest_file proc
-;       push dx
-;    
-;    mov ah,5Bh
-;    mov cl,0
-;    int 21h
-;    
-;    jnc file_created_and_opened
-;    
-;    mov dx,offset error_message2
-;    show_str
-;    
-;    file_created_and_opened:
-;    
-;    pop dx
-;    ret
-;   ;  mov ah,5Ah
-;;    mov cl,0
-;;    int 21h  
-;    ;mov ah,5Bh
-;;    mov cl,0     
-;;    xor cx,cx
-;;    int 21h
-;  ;  mov ah, 3Ch ;creating destionation file
-;;    xor cx,cx
-;;    lea dx, destination_path
-;;    int 21h
-;;    
-;;    jc open_error
-;;    
-;;    mov ah,3Dh
-;;    mov al,02h
-;;    lea dx, destination_path
-;;    int 21h 
-;;    
-;;    jc open_error
-;;    
-;;    mov dest_handle, ax ;remember dest_handle
-;;    
-;;    mov ax,0
-;;    jmp end_proc
-;;    ret
-;endp
 
 open_file PROC
     push cx 
@@ -227,8 +180,8 @@ open_file PROC
     
     jnc file_opened
     
-    mov dx,offset error_message1
-    show_str
+    mov dx,offset  open_error_str;error_message1
+    output_str
     
     file_opened:
     
@@ -246,85 +199,14 @@ create_and_open_file PROC
     
     jnc file_created_and_opened
     
-    mov dx,offset error_message2
-    show_str
+    mov dx,offset open_error_str;error_message2
+    output_str
     
     file_created_and_opened:
     
     pop dx
     ret
 create_and_open_file ENDP
-;open_file proc 
-;    push bx
-;    push dx
-;    push si
-;               
-;    lea si, file_path
-;    call str_len
-;    
-;    xor si,si
-;    mov si,ax;in si amount of bytes in finded file path
-;    sub si,1           
-;    ;check extension of the file           
-;    cmp file_path[si], 't' 
-;	jne check_open_error     	
-;	sub si, 1
-;	
-;	cmp file_path[si], 'x' 
-;	jne check_open_error    	
-;	sub si, 1
-;	
-;	cmp file_path[si], 't' 
-;	jne check_open_error   	
-;	sub si, 1
-;	
-;	cmp file_path[si], '.' 
-;	jne check_open_error               
-;    jmp open_source_file
-;
-;check_open_error: 
-;	pop si
-;	jmp open_error           
-;               
-;open_source_file:                
-;	pop si           
-;               
-;    mov ah,3Dh;function to open file
-;    mov al,02h; open file for read/write 
-;    mov cl,0
-;    lea dx,file_path;
-;    int 21h
-;    
-;    jc open_error  
-;    
-;    output_str open_source_file_str
-;    
-;    mov source_handle,ax 
-;    
-;    call create_and_open_dest_file
-;    
-;open_error:
-;     
-;     output_str open_error_str
-;     
-;     cmp ax,02h
-;     jne found_error
-;     
-;     output_str open_error_str
-;     
-;     jmp found_error
-;    
-;     
-;found_error:
-;    mov ax,1
-;end_proc:
-;    
-;    pop dx
-;    pop bx
-;    
-;    ret             
-;open_file endp
-
 
 str_len proc
     push cx                   
@@ -334,11 +216,11 @@ str_len proc
 	;lea si,word  ; set offset of word to si
 count_len:                  
      mov bl, ds:[si];go while not zero          
-	 cmp bl,  0            
+	 cmp bl,  end_of_asciiz_str;0            
 	 je end_count_len             
 	 inc si                
 	 inc ax                                                                    
-	 jmp count_len           
+jmp count_len           
 	                            ;
 end_count_len:
     mov size_of_word, ax                    ;
@@ -347,8 +229,7 @@ end_count_len:
 	pop cx                      
 	ret                         ;
 str_len endp
-
-            
+           
 read_from_file proc
     push bx
     push cx
@@ -385,12 +266,9 @@ set_pointer_by_processed_bytes endp
                     
 close_file proc
     pusha
-    ;mistakegfbudh
-    ;mov bx, source_handle ;
     xor ax, ax      ; 
     mov ah, 3Eh     ; close file
-    int 21h         ; 
-    
+    int 21h         ;     
     popa
     ret
 close_file endp   
@@ -398,15 +276,15 @@ close_file endp
 
 write_buffer proc 
     ;write cx bytes to destination file
-        pusha
-        lea dx, file_buffer      
-        mov bx, dest_handle
-        mov cx, ax
-        mov ah, 40h   
-        int 21h
+    pusha
+    lea dx, file_buffer      
+    mov bx, dest_handle
+    mov cx, ax
+    mov ah, 40h   
+    int 21h
           
-        popa
-        ret  
+    popa
+    ret  
 write_buffer endp                    
                     
 add_processed_bytes proc 
@@ -430,23 +308,35 @@ start:
     mov ax, @data
     mov es, ax
     call read_cmdl                         ;
-	mov ds, ax  
-     
-    ;mov cmdl_size, bl 
+	mov ds, ax   
+	
+	;check empty cmdl
+	lea si, cmdl
+    call str_len
+    cmp ax,0
+    je  emp
     
     ;output_str getting_file_path        
-    call get_file_path  
-    cmp ax, 0
-    je invalid_parameter
-    ;cmp_arg_len_with_zero file_path
-    
+    call get_file_path
+    push si
+    lea si, file_path
+    call str_len
+    cmp ax,0
+    je  emp
+    pop si  
+      
     ;output_str getting_word
-    call get_word
+    call get_word 
+    push si
+    lea si, deleted_word
+    call str_len
+    cmp ax,0
+    je  emp
+    pop si
     
     mov dx,offset file_path     
     call open_file
-    cmp ax, 0               
-	;jne end_program 
+    jc end_program               
 	
 	mov source_handle,ax
 	
@@ -483,142 +373,135 @@ process_files:
     mov cl, al; amount of bytes we should process  
     inc cx
 find_the_word:
-        pusha  
+    pusha  
         ;check delimiters to find words
-        cmp begin_buffer_flag, 0
-        je str_cmp 
+    cmp begin_buffer_flag, 0
+    je str_cmp 
                 
-        cmp ds[si-1], space;' '
-        je str_cmp 
+    cmp ds[si-1], space;' '
+    je str_cmp 
         
-        cmp ds[si-1], '$'
-        je str_cmp                                                                                  
-           
-        cmp ds[si-1], 0Dh
-        je str_cmp   
+    cmp ds[si-1], '$'
+    je str_cmp                                                                                  
+          
+    cmp ds[si-1], car_return_symbol;0Dh
+    je str_cmp   
         
+    cmp ds[si-1], new_line_symbol;0Ah
+    je str_cmp
         
-        cmp ds[si-1], 0Ah
-        je str_cmp
-        
-        cmp ds[si-1], tab;09h
-        je str_cmp
+    cmp ds[si-1], tab;09h
+    je str_cmp
+
+    cmp ds[si-1], end_of_asciiz_str;0h
+    je str_cmp
        
-        cmp ds[si-1], 0h
-        je str_cmp
-       
-        jmp next
+    jmp next
          
 str_cmp:        
-  
-        xor cx, cx 
-        mov cx, dx   ; in dx size of word       
-        repe cmpsb         
-        jnz next      
+    xor cx, cx 
+    mov cx, dx   ; in dx size of word       
+    repe cmpsb         
+    jnz next      
         
-        cmp ds[si],space; ' ';space
-        je is_find 
+    cmp ds[si], space; ' ';space
+    je is_find 
         
-        cmp ds[si], '$' 
-        je is_find
+    cmp ds[si], '$' 
+    je is_find
         
-        cmp ds[si], 0Dh 
-        je is_find
+    cmp ds[si],car_return_symbol; 0Dh 
+    je is_find
         
-        cmp ds[si], 0Ah
-        je is_find
+    cmp ds[si], new_line_symbol;0Ah
+    je is_find
         
-        cmp ds[si], 09h
-        je is_find
+    cmp ds[si], tab;09h
+    je is_find
        
-        cmp ds[si],  0h
-        je is_find
-         
+    cmp ds[si],  end_of_asciiz_str;0h
+    je is_find        
 next:
         
-        popa                  
+     popa                  
         
-        mov begin_buffer_flag, 0
+     mov begin_buffer_flag, 0
                          
-        inc si              ;next symbol of file buffer                                      
-        lea di, deleted_word        ;set di to begin of te deleted word                                  
-        loop find_the_word  ;            
+     inc si              ;next symbol of file buffer                                      
+     lea di, deleted_word        ;set di to begin of te deleted word                                  
+     loop find_the_word  ;            
       
-        mov ax, readed_bytes
-        call write_buffer
+     mov ax, readed_bytes
+     call write_buffer
    
-        mov ax, readed_bytes 
-        ;add ax, size_of_word 
-        call add_processed_bytes   
+     mov ax, readed_bytes 
+     ;add ax, size_of_word 
+     call add_processed_bytes   
  
-        jmp process_files          
-                  
+     jmp process_files                            
 is_find:
         
-       mov di, offset file_buffer; begin of file buffer to di 
+     mov di, offset file_buffer; begin of file buffer to di 
 
-       mov cx, si       ; end of finded qord to di      
+     mov cx, si       ; end of finded qord to di      
       
-       sub cx, offset file_buffer; get position in file buffer where word ended  
+     sub cx, offset file_buffer; get position in file buffer where word ended  
        
-       xor ax, ax
-       mov ax, size_of_word;
+     xor ax, ax
+     mov ax, size_of_word;
       
-       sub cx, ax;return to begin of the word 
+     sub cx, ax;return to begin of the word 
        
 next_write_to_buffer:
        
-       mov ax, cx  ; begin of the word
+     mov ax, cx  ; begin of the word
        
-       call write_buffer 
+     call write_buffer 
      
-       call add_processed_bytes;add proccesed bytes without finded word
+     call add_processed_bytes;add proccesed bytes without finded word
       
-       mov ax, size_of_word
-       call add_processed_bytes ;add processed bytes after finded word, which we shouldn't to write
+     mov ax, size_of_word
+     
+     call add_processed_bytes ;add processed bytes after finded word, which we shouldn't to write
        
-       jmp process_files                            
+     jmp process_files                            
    
 write_small_part_of_word:
-       mov ax, readed_bytes
-       call write_buffer 
-       jmp ending  
+     mov ax, readed_bytes
+     
+     call write_buffer 
+     
+     jmp ending  
                 
 ending:
     
 mov bx, dest_handle
-;mov ah, 3Eh     ; close file
-;    int 21h
+
 call close_file 
-
+                                    
 mov bx, source_handle
-;mov ah, 3Eh     ; close file
-;int 21h
+
 call close_file  
-
-
-
-
+;delete file
 xor ax,ax 
 mov ah,41h
 lea dx, file_path
-int 21h 
-;output_str destination_path
-;output_str file_path
+int 21h                                              
 
+;renaming dest file
 mov ah,56h
 mov dx,offset destination_path
 mov di,offset file_path
 int 21h                
-jc emp
+jnc end_program
+ 
+lea dx ,close_files_str
+output_str  
+jmp end_program
 
-;output_str  close_files_str
-;jmp end_program
-
-invalid_parameter:
-
-emp:
-    ;output_str empty_command_line
+emp:     
+    lea dx,empty_command_line
+    output_str 
 end_program:
     mov ax,4c00h
     int 21h       
