@@ -28,18 +28,15 @@
 
      begin_buffer_flag db 0  
      
-
-     ;file_id dw 0
-;     result_file_id dw 0 
      empty_command_line db "Empty command line", '$'                
      open_error_str db "Open error", '$'
      found_error_str db "File not found", '$' 
-     read_error db "Read error",'$'
+     ;read_error_line db "Read error",'$'
      open_source_file_str db "Open source file", '$'
      getting_file_path db "Get file path", '$' 
-     getting_word db  "Get word", '$'
-     get_word_len db "Get word len",'$' 
-     close_files_str db "Close files",'$'
+     rename_error_line db  "Rename error", '$'
+     delete_error_line db "Delete error",'$' 
+     not_all_parameters_line db "Not all parameters here",'$'
      new_line db 10,13,'$'
 
      space equ ' '
@@ -102,16 +99,6 @@ delim_symbol:
      ret              
 get_file_path endp      
 
-;cmp_arg_len_with_zero macro string  
-;    push si
-;    
-;    lea si, string
-;    call str_len
-;    
-;    pop si
-;    cmp ax,0
-;    je  emp
-;endm    
 
 read_cmdl proc
     push cx 
@@ -331,7 +318,7 @@ start:
     lea si, deleted_word
     call str_len
     cmp ax,0
-    je  emp
+    je  not_all_parameters
     pop si
     
     mov dx,offset file_path     
@@ -381,7 +368,7 @@ find_the_word:
     cmp ds[si-1], space;' '
     je str_cmp 
         
-    cmp ds[si-1], '$'
+    cmp ds[si-1], end_of_str;'$'
     je str_cmp                                                                                  
           
     cmp ds[si-1], car_return_symbol;0Dh
@@ -407,7 +394,7 @@ str_cmp:
     cmp ds[si], space; ' ';space
     je is_find 
         
-    cmp ds[si], '$' 
+    cmp ds[si], end_of_str;'$' 
     je is_find
         
     cmp ds[si],car_return_symbol; 0Dh 
@@ -472,7 +459,10 @@ write_small_part_of_word:
      call write_buffer 
      
      jmp ending  
-                
+
+;read_error:
+;    lea dx ,read_error_line
+;    output_str                
 ending:
     
 mov bx, dest_handle
@@ -481,27 +471,42 @@ call close_file
                                     
 mov bx, source_handle
 
-call close_file  
+call close_file
+jc end_program
+
+;lea dx ,close_files_str
+;output_str  
+;jmp end_program  
+
 ;delete file
-xor ax,ax 
-mov ah,41h
-lea dx, file_path
-int 21h                                              
-
+    xor ax,ax 
+    mov ah,41h
+    lea dx, file_path
+    int 21h                                              
+    jc  delete_error
 ;renaming dest file
-mov ah,56h
-mov dx,offset destination_path
-mov di,offset file_path
-int 21h                
-jnc end_program
- 
-lea dx ,close_files_str
-output_str  
-jmp end_program
+    mov ah,56h
+    mov dx,offset destination_path
+    mov di,offset file_path
+    int 21h                
+    jnc end_program
+    jmp rename_error
 
+not_all_parameters:
+    lea dx,not_all_parameters_line
+    output_str
+    jmp end_program 
 emp:     
     lea dx,empty_command_line
-    output_str 
+    output_str
+    jmp end_program
+rename_error:
+    lea dx, rename_error_line    
+    output_str
+    jmp end_program
+delete_error:
+    lea dx,delete_error_line
+    output_str    
 end_program:
     mov ax,4c00h
     int 21h       
