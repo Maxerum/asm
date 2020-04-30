@@ -30,10 +30,6 @@
      
      empty_command_line db "Empty command line", '$'                
      open_error_str db "Open error", '$'
-     found_error_str db "File not found", '$' 
-     ;read_error_line db "Read error",'$'
-     open_source_file_str db "Open source file", '$'
-     getting_file_path db "Get file path", '$' 
      rename_error_line db  "Rename error", '$'
      delete_error_line db "Delete error",'$' 
      not_all_parameters_line db "Not all parameters here",'$'
@@ -156,7 +152,7 @@ delim_symbol_w:
      ret             
 endp
 
-open_file PROC
+open_file proc
     push cx 
     push dx
     
@@ -167,7 +163,7 @@ open_file PROC
     
     jnc file_opened
     
-    mov dx,offset  open_error_str;error_message1
+    lea dx, open_error_str
     output_str
     
     file_opened:
@@ -175,9 +171,9 @@ open_file PROC
     pop dx 
     pop cx
     ret
-open_file ENDP
+open_file endp
 
-create_and_open_file PROC
+create_and_open_file proc
     push dx
     
     mov ah,5Bh
@@ -186,14 +182,14 @@ create_and_open_file PROC
     
     jnc file_created_and_opened
     
-    mov dx,offset open_error_str;error_message2
+    lea dx, open_error_str
     output_str
     
     file_created_and_opened:
     
     pop dx
     ret
-create_and_open_file ENDP
+create_and_open_file endp
 
 str_len proc
     push cx                   
@@ -227,7 +223,7 @@ read_from_file proc
     mov bx, source_handle        ; a part of file to buffer  
     mov ah, 3Fh                  ;            
     mov cx, buferr_size;200                  ;max amount of bytes to read      
-    mov dx, offset file_buffer   ; 
+    lea dx, file_buffer   ; 
     int 21h   
     
     mov readed_bytes, ax ;amount of readed bytes
@@ -243,8 +239,8 @@ set_pointer_by_processed_bytes proc
     mov bx, source_handle
     mov al, 00h; move pointer from begin  
     xor cx, cx                      ;the beginning of file  
-    mov dx, processed_bytes_l         ; - 
-    mov cx, processed_bytes_h         ; - amount of bytes
+    mov dx, processed_bytes_l         ;  
+    mov cx, processed_bytes_h         ;  amount of bytes
     mov ah, 42h 
     int 21h 
     popa    
@@ -321,7 +317,7 @@ start:
     je  not_all_parameters
     pop si
     
-    mov dx,offset file_path     
+    lea dx, file_path     
     call open_file
     jc end_program               
 	
@@ -428,7 +424,7 @@ next:
      jmp process_files                            
 is_find:
         
-     mov di, offset file_buffer; begin of file buffer to di 
+     lea di, file_buffer; begin of file buffer to di 
 
      mov cx, si       ; end of finded qord to di      
       
