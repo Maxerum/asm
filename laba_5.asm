@@ -176,9 +176,22 @@ open_file endp
 create_and_open_file proc
     push dx
     
-    mov ah,5Bh
-    mov cl,0
+    mov ah, 3Ch ;creating destionation file
+    xor cx,cx
+    lea dx, destination_path
     int 21h
+    
+    jnc file_created_and_opened
+    ;jb open_error
+;    jc open_error
+    
+    mov ah,3Dh
+    mov al,02h
+    lea dx, destination_path
+    int 21h
+    ;mov ah,5Bh
+;    mov cl,0
+;    int 21h
     
     jnc file_created_and_opened
     
@@ -386,7 +399,36 @@ str_cmp:
     mov cx, dx   ; in dx size of word       
     repe cmpsb         
     jnz next      
+    
+check_first_space:
+    
+    mov bx,si
+    sub  bx, size_of_word
+    sub  bx,1
+    
+    cmp ds[bx], space;' '
+    je check_second_space 
         
+    cmp ds[bx], end_of_str;'$'
+    je check_second_space                                                                               
+          
+    cmp ds[bx], car_return_symbol;0Dh
+    je check_second_space  
+        
+    cmp ds[bx], new_line_symbol;0Ah
+    je check_second_space  
+    
+    cmp ds[bx], end_of_asciiz_str;0h
+    je check_second_space    
+    
+    cmp ds[bx], tab;09h
+    je check_second_space
+
+    
+    
+    jmp next
+    
+check_second_space:        
     cmp ds[si], space; ' ';space
     je is_find 
         
@@ -403,7 +445,8 @@ str_cmp:
     je is_find
        
     cmp ds[si],  end_of_asciiz_str;0h
-    je is_find        
+    je is_find  
+          
 next:
         
      popa                  
