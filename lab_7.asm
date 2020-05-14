@@ -19,18 +19,18 @@ tab equ 9
 end_of_asciiz_str equ 0 
 end_of_str equ '$'
 
-end_of_program_7 db "Program was finished", '$'
+memory_error_str db "Program was finished", '$'
 file_is_not_founded db "file_is_not_founded ", '$'
 folder_is_not_found db "Folder is not found", '$'
 empty_cmdl db "Empty command line", '$'
 new_line db 10,13,'$'
 
 epb 	dw 0
-			dw offset line,0
-			dw 005Ch,0,006Ch,0		
-line db 125
+			dw offset new_cmdl,0 ;new command line
+			dw 005Ch,0,006Ch,0; File BLock adresses 		
+new_cmdl db 125
 	 db " /?"
-line_text db 122 dup(?)
+new_cmdl_text db 122 dup(?)
 
 extension db "*.exe", 0
 
@@ -57,6 +57,7 @@ endm
 
 start:
     call  realocate_memory_block  
+    jc memory_error
     
 	mov ax, @data
 	mov es, ax
@@ -65,6 +66,7 @@ start:
 	mov ds, ax
 
 	call get_folder_path 
+	;check folder len
 	push si
     lea si, folder_path
     call str_len
@@ -80,19 +82,19 @@ start:
     
 emp:
 	output_str empty_cmdl
+	jmp exit
+memory_error:
+    output_str memory_error_str	
 exit:
-	;exit
-	;output_str end_of_program_7
-
 	mov ah, 4Ch
 	int 21h
 
 realocate_memory_block proc
-    mov ah, 4Ah
+    mov ah, 4Ah ;free all memory after ending program and stack
 	mov bx, ((code_size/16)+1)+((data_size/16)+1)+32	
 	int 21h
     ret
-endp
+realocate_memory_block endp
 
 find_folder proc
     mov ah, 3Bh
@@ -104,29 +106,32 @@ find_folder proc
     
     folder_is_founded:
     ret
-endp    
+find_folder endp    
 
 run_programs proc
-
 	call find_first_file
 	jnc run_exe_
 	output_str file_is_not_founded
 	jmp proc_out				
 run_exe_:
-	call run_exe
+	call run_exe 
+	;use ax to identificate errors
 	cmp ax, 0
 	jne exit				
 
 run_next_files:
 	call find_next_file
+	;use ax to identificate errors
 	cmp ax, 0
 	jne exit				
 
-	call run_exe
+	call run_exe 
+	;use ax to identificate errors
 	cmp ax, 0
 	jne exit				
 
-jmp run_next_files
+jmp run_next_files 
+
 proc_out:
     ret	
 run_programs endp	
@@ -156,10 +161,10 @@ get_folder_path proc
 	push di
 
 	mov cl, cmd_size
-	xor ch, ch
+	xor cx, cx
 
 	lea si, cmdl
-	inc si
+	inc si  ; skip one space in command line
 	lea di, folder_path     
 loop_get_path:
 	mov al, ds:[si]
@@ -191,11 +196,10 @@ str_len proc
 	push bx 
 	push si
 	xor ax, ax
-
 count_len:                  
      mov bl, ds:[si];          
 	 cmp bl,  0            
-	 je end_count_len             
+je end_count_len             
 	 inc si                
 	 inc ax                                                                    
 jmp count_len           
@@ -210,9 +214,10 @@ run_exe proc
 	push bx
 	push dx
 
-	mov ax, 4B00h				
-	mov bx, offset epb
-	mov dx, offset DTA_block + 1Eh	;???????? ??? ????? ?? DTA
+	mov ah, 4Bh ;load program
+	mov al, 00h	;number of function			
+	lea bx,  epb; addres exec parameter block for loaded program
+	mov dx, offset DTA_block + 1Eh;addres program name 	
 	int 21h
 	
 	jnc run_exe_good
@@ -233,24 +238,24 @@ run_exe endp
 
 find_first_file proc
 	mov ah,1Ah
-    mov dx, offset DTA_block
+    lea dx, DTA_block
     int 21h
 
-    mov ah,4Eh
+    mov ah,4Eh ; find file, in begin we will use mask for finding file
     xor cx,cx               		 
-    lea dx, extension    
+    lea dx, extension; mask which used for finding exe-files   
     int 21h
     
 	ret
 find_first_file endp
 
 find_next_file proc
-	mov ah,1Ah
-    mov dx, offset DTA_block
+	mov ah,1Ah       ;install DTA-block for finding file, usually it places in command line PSP 
+    lea dx, DTA_block
     int 21h
 
-	mov ah,4Fh
-    mov dx, offset DTA_block       
+	mov ah,4Fh ;find next file
+    lea dx, DTA_block;dta contains data from previous call 4Eh or 4Fh        
     int 21h
 
 	jnc find_next_file_good
