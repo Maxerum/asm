@@ -1,7 +1,8 @@
+
 .model small
 
 .data
-
+;.386
 cmd_size db ?
 
 max_cmdl_size equ 127
@@ -9,9 +10,14 @@ cmdl db max_cmdl_size + 2 dup(0)
 folder_path db max_cmdl_size + 2 dup(0)
 
 ;Disk Transfer Area
-size_of_DTA_block equ 2Ch
+size_of_DTA_block equ 2Ch;ther is required size of buffer
 DTA_block db size_of_DTA_block dup(0)
 
+curdisk  db "c:\"
+curdir   db 64 dup(?)  
+cur_drive db 64 dup(?) 
+lol db ":\"
+    
 space equ ' '
 new_line_symbol equ 13
 car_return_symbol equ 10
@@ -19,7 +25,7 @@ tab equ 9
 end_of_asciiz_str equ 0 
 end_of_str equ '$'
 
-memory_error_str db "Program was finished", '$'
+memory_error_str db "Memory error", '$'
 file_is_not_founded db "file_is_not_founded ", '$'
 folder_is_not_found db "Folder is not found", '$'
 empty_cmdl db "Empty command line", '$'
@@ -34,10 +40,13 @@ new_cmdl_text db 122 dup(?)
 
 extension db "*.exe", 0
 
-data_size=$-cmd_size
+size_of_source_folder equ 64
+source_folder db  size_of_source_folder dup(0),'$'
+data_size = $-cmd_size
 
 .stack 100h
-.code 
+.code     
+
 output_str macro str
     push ax
     push dx
@@ -73,12 +82,22 @@ start:
     cmp ax,0
     je  emp
     pop si
-
+    
+    call remember_current_folder
+    jc exit
+    
+    output_str source_folder
+    
 	call find_folder
 	jc exit
 	
 	call run_programs
     jc exit
+    
+    
+     
+    ;call return_directory
+;    jc exit
     
 emp:
 	output_str empty_cmdl
@@ -86,6 +105,25 @@ emp:
 memory_error:
     output_str memory_error_str	
 exit:
+    ;mov ah, 3Bh
+;    lea dx,  source_folder
+;    int 21h  
+    lea dx, cur_drive
+    mov ah, 3Bh
+    int 21h 
+    
+    lea dx, curdir
+    mov ah, 3Bh
+    int 21h            
+    
+    
+    ;mov ah,47h
+;    mov dl,00h
+;    mov si, offset source_folder  
+;    int 21h 
+    
+    ;output_str source_folder
+    
 	mov ah, 4Ch
 	int 21h
 
@@ -94,7 +132,31 @@ realocate_memory_block proc
 	mov bx, ((code_size/16)+1)+((data_size/16)+1)+32	
 	int 21h
     ret
-realocate_memory_block endp
+endp
+
+remember_current_folder proc
+    push di
+    mov ah,19h          
+    int 21h 
+    lea  di,cur_drive
+rewrite_drive_name:
+    add al,41h
+    mov dl,al
+    mov es:[di], dl
+    mov al, ':'
+    inc di
+    mov es:[di], al 
+    mov al, '\'  
+    inc di
+    mov es:[di], al
+
+    mov ah,47h
+    mov dl,00h
+    mov si, offset curdir;source_folder  
+    int 21h
+    pop di     
+    ret
+endp
 
 find_folder proc
     mov ah, 3Bh
