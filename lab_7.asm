@@ -1,22 +1,21 @@
-
 .model small
 
 .data
-;.386
+.386
 cmd_size db ?
 
 max_cmdl_size equ 127
 cmdl db max_cmdl_size + 2 dup(0)
 folder_path db max_cmdl_size + 2 dup(0)
 
-;Disk Transfer Area
-size_of_DTA_block equ 2Ch;ther is required size of buffer
-DTA_block db size_of_DTA_block dup(0)
 
-curdisk  db "c:\"
-curdir   db 64 dup(?)  
+size_of_DTA equ 2Ch;ther is required size of buffer
+DTA db size_of_DTA dup(0)
+
+;curdisk  db "c:\"
+source_folder  db 64 dup(?)  
 cur_drive db 64 dup(?) 
-lol db ":\"
+;add_to_drive_letter db ":\"
     
 space equ ' '
 new_line_symbol equ 13
@@ -40,8 +39,8 @@ new_cmdl_text db 122 dup(?)
 
 extension db "*.exe", 0
 
-size_of_source_folder equ 64
-source_folder db  size_of_source_folder dup(0),'$'
+;size_of_source_folder equ 64
+;source_folder db  size_of_source_folder dup(0),'$'
 data_size = $-cmd_size
 
 .stack 100h
@@ -83,46 +82,30 @@ start:
     je  emp
     pop si
     
-    call remember_current_folder
+    call remember_current_folder_and_drive
     jc exit
     
-    output_str source_folder
+    ;output_str source_folder
     
-	call find_folder
+	call go_to_given_folder
 	jc exit
 	
-	call run_programs
+	call run_programs_from_given_folder
     jc exit
-    
-    
-     
-    ;call return_directory
-;    jc exit
-    
+
 emp:
 	output_str empty_cmdl
 	jmp exit
 memory_error:
     output_str memory_error_str	
 exit:
-    ;mov ah, 3Bh
-;    lea dx,  source_folder
-;    int 21h  
     lea dx, cur_drive
     mov ah, 3Bh
     int 21h 
     
-    lea dx, curdir
+    lea dx, source_folder
     mov ah, 3Bh
     int 21h            
-    
-    
-    ;mov ah,47h
-;    mov dl,00h
-;    mov si, offset source_folder  
-;    int 21h 
-    
-    ;output_str source_folder
     
 	mov ah, 4Ch
 	int 21h
@@ -134,14 +117,16 @@ realocate_memory_block proc
     ret
 endp
 
-remember_current_folder proc
-    push di
-    mov ah,19h          
+remember_current_folder_and_drive proc
+    push di    
+     ;define current dos drive
+    mov ah,19h; in al will be number which corresponds to drive letter(0=A, 1=B and many other)          
     int 21h 
-    lea  di,cur_drive
+    lea  di,cur_drive;set di to cur_drive 
 rewrite_drive_name:
-    add al,41h
+    add al,41h ; to get letter of drive
     mov dl,al
+    ;do name of cur_drive in format like this "C:\"
     mov es:[di], dl
     mov al, ':'
     inc di
@@ -149,16 +134,19 @@ rewrite_drive_name:
     mov al, '\'  
     inc di
     mov es:[di], al
-
+    inc di      
+    mov al,end_of_asciiz_str
+    mov es:[di], al
+    ;remember source  folder
     mov ah,47h
     mov dl,00h
-    mov si, offset curdir;source_folder  
+    mov si, offset source_folder;source_folder  
     int 21h
     pop di     
     ret
 endp
 
-find_folder proc
+go_to_given_folder proc
     mov ah, 3Bh
     lea dx,  folder_path
     int 21h 
@@ -168,15 +156,15 @@ find_folder proc
     
     folder_is_founded:
     ret
-find_folder endp    
+go_to_given_folder endp    
 
-run_programs proc
+run_programs_from_given_folder proc
 	call find_first_file
-	jnc run_exe_
+	jnc run_programs
 	output_str file_is_not_founded
 	jmp proc_out				
-run_exe_:
-	call run_exe 
+run_programs:
+	call run_program 
 	;use ax to identificate errors
 	cmp ax, 0
 	jne exit				
@@ -187,7 +175,7 @@ run_next_files:
 	cmp ax, 0
 	jne exit				
 
-	call run_exe 
+	call run_program 
 	;use ax to identificate errors
 	cmp ax, 0
 	jne exit				
@@ -196,7 +184,7 @@ jmp run_next_files
 
 proc_out:
     ret	
-run_programs endp	
+run_programs_from_given_folder endp	
 
 read_cmdl proc
     push cx 
@@ -272,35 +260,37 @@ end_count_len:
 	ret
 str_len endp
 
-run_exe proc
+run_program proc
 	push bx
 	push dx
 
 	mov ah, 4Bh ;load program
 	mov al, 00h	;number of function			
 	lea bx,  epb; addres exec parameter block for loaded program
-	mov dx, offset DTA_block + 1Eh;addres program name 	
+	mov dx, offset DTA + 1Eh;addres program name 	
 	int 21h
 	
-	jnc run_exe_good
+	jnc run_program_good
 
 	mov ax, 1
 
-	jmp run_exe_out
+	jmp run_program_out
 
-run_exe_good:
+run_program_good:
 	mov ax, 0
 
-run_exe_out:
+run_program_out:
 	pop dx
 	pop  bx
 	ret
-run_exe endp
+run_program endp
 
 
-find_first_file proc
+find_first_file proc 
+    ;install DTA install DTA-block for finding file, usually it places in command line PSP
 	mov ah,1Ah
-    lea dx, DTA_block
+    lea dx, DTA
+    ;after call this procedure dta_block will be filled with data
     int 21h
 
     mov ah,4Eh ; find file, in begin we will use mask for finding file
@@ -313,11 +303,11 @@ find_first_file endp
 
 find_next_file proc
 	mov ah,1Ah       ;install DTA-block for finding file, usually it places in command line PSP 
-    lea dx, DTA_block
+    lea dx, DTA
     int 21h
 
 	mov ah,4Fh ;find next file
-    lea dx, DTA_block;dta contains data from previous call 4Eh or 4Fh        
+    lea dx, DTA;dta contains data from previous call 4Eh or 4Fh        
     int 21h
 
 	jnc find_next_file_good
